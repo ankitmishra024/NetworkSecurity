@@ -22,6 +22,8 @@ from sklearn.ensemble import (
     RandomForestClassifier
 )
 import mlflow
+import dagshub
+dagshub.init(repo_owner='ankitmishra06', repo_name='NetworkSecurity', mlflow=True)
 
 
 class ModelTrainer:
@@ -36,7 +38,7 @@ class ModelTrainer:
             raise NetworkSecurityException(e, sys)
         
     
-    mlflow.set_tracking_uri(uri="http://127.0.0.1:5000")
+    # mlflow.set_tracking_uri(uri="http://127.0.0.1:5000")
     def track_mlflow(self,best_model, classificationmetric):
         with mlflow.start_run():
             f1_score=classificationmetric.f1_score
