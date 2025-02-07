@@ -1,97 +1,132 @@
 name: workflow
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'README.md'
-
-permissions:
-  id-token: write
-  contents: read
+    push:
+        branches:
+            - main
+        paths-ignore:
+            - "README.md"
 
 jobs:
-  integration:
-    name: Continuous Integration
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    integration:
+        name: Continuous Integration
+        runs-on: ubuntu-latest
 
-      - name: Lint code
-        run: echo "Linting repository"
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v3
 
-      - name: Run unit tests
-        run: echo "Running unit tests"
+            - name: Lint code
+              run: echo "Linting repository"
 
-  build-and-push-ecr-image:
-    name: Continuous Delivery
-    needs: integration
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+            - name: Run unit tests
+              run: echo "Running unit tests"
+    
+    build-and-push-ecr-image:
+        name: Continuous Delivery
+        needs: integration
+        runs-on: ubuntu-latest
+        
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v3
+            
+            - name: Install Utilities
+              run: |
+                sudo apt-get update
+                sudo apt-get install -y jq unzip
 
-      - name: Install Utilities
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq unzip
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+            - name: Configure AWS credentials
+              uses: aws-action/configure-aws-credentials@v1
+              with:
+                aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+            - name: Login to Amazon ECR
+              id: login-ecr
+              uses: aws-actions/amazon-ecr-login@v1
+            
+            - name: Build, tag, and push image to Amazon ECR
+              id: build-image
+              env:
+                ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry}}
+                ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME}}
+                IMAGE_TAG: latest
+              run: |
+                # Build a docker container and 
+                # push it to ECR so that it can
+                # be deployed to ECS.
 
-      - name: Build, tag, and push image to Amazon ECR
-        id: build-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
-          IMAGE_TAG: latest
-        run: |
-          # Build a docker container and
-          # push it to ECR so that it can
-          # be deployed to ECS.
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+                docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+                docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
-  Continuous-Deployment:
-    needs: build-and-push-ecr-image
+            
+    # Third Job: Continuous Deployment
+    Continuous-Deployment:
+    needs: build-and-push-ecrimage
     runs-on: self-hosted
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+        - name: Checkout Code
+          uses: actions/checkout@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+        - name: Configure AWS Credentials
+          uses: aws-actions/configure-aws-credentials@v1
+          with:
+            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-      
-      
-      - name: Pull latest images
-        run: |
-         docker pull ${{secrets.AWS_ECR_LOGIN_URI}}/${{ secrets.ECR_REPOSITORY_NAME }}:latest
-         
-      #- name: Stop and remove  container if running
-       # run: |
-        # docker ps -q --filter "name=networksecurity" | grep -q . && docker stop networksecurity && docker rm -fv networksecurity
-       
-      - name: Run Docker Image to serve users
-        run: |
-         docker run -d -p 8080:8080 --ipc="host" --name=networksecurity -e 'AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}' -e 'AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}' -e 'AWS_REGION=${{ secrets.AWS_REGION }}'  ${{secrets.AWS_ECR_LOGIN_URI}}/${{ secrets.ECR_REPOSITORY_NAME }}:latest
-      - name: Clean previous images and containers
-        run: |
-         docker system prune -f
+        - name: Login to Amazon ECR
+          id: login-ecr
+          uses: aws-actions/amazon-ecr-login@v1  # Authenticate with ECR
+
+        - name: Debug: Display Constructed Docker Image Name
+          run: |
+            echo "Using Docker Image ->"
+            echo "Registry: ${REGISTRY}"
+            echo "Repository: ${REPO}"
+            echo "Tag: latest"
+          env:
+            REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+            REPO: ${{ secrets.ECR_REPOSITORY_NAME }}
+        
+        
+
+        - name: Pull Latest Docker Image from Amazon ECR
+          run: |
+            docker pull ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY_NAME }}:latest
+
+        - name: Stop and Remove Existing Container (if running)
+          run: |
+            if [ "$(docker ps -q -f name=networksecurity06)" ]; then
+                echo "Stopping and removing existing container..."
+                docker stop networksecurity06
+                docker rm -fv networksecurity06
+            else
+                echo "No existing container found. Proceeding with deployment."
+            fi
+
+        - name: Run Docker Container to Serve Users
+          run: |
+            IMAGE_NAME="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY_NAME }}:latest"
+            
+            if [[ -z "$IMAGE_NAME" ]]; then
+              echo "Error: Image name is empty!"
+              exit 1
+            fi
+
+            docker run -d \
+              -p 8080:8080 \
+              --ipc="host" \
+              --name=networksecurity06 \
+              -e "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+              -e "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+              -e "AWS_REGION=${{ secrets.AWS_REGION }}" \
+              "$IMAGE_NAME"
+
+        - name: Clean Up Old Docker Images and Containers
+          run: |
+            docker system prune -f
