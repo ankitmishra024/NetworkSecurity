@@ -3,9 +3,9 @@ name: workflow
 on:
   push:
     branches:
-      - main
+      - main # Trigger workflow only on pushes to the main branc
     paths-ignore:
-      - 'README.md'
+      - 'README.md' # Ignore changes to the README file
 
 permissions:
   id-token: write
@@ -17,21 +17,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3 # Fetch the latest code from the repository
 
       - name: Lint code
-        run: echo "Linting repository"
+        run: echo "Linting repository"   # Placeholder for linting process (Replace with actual linter command)
 
       - name: Run unit tests
-        run: echo "Running unit tests"
+        run: echo "Running unit tests"  # Placeholder for unit testing (Replace with actual test command)
+
 
   build-and-push-ecr-image:
     name: Continuous Delivery
-    needs: integration
+    needs: integration # Run only after the integration job completes successfully
+
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3   # Fetch the latest code from the repository
+
+
 
       - name: Install Utilities
         run: |
@@ -46,7 +50,7 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v1   # Authenticate with AWS ECR
 
       - name: Build, tag, and push image to Amazon ECR
         id: build-image
@@ -63,11 +67,12 @@ jobs:
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
   Continuous-Deployment:
-    needs: build-and-push-ecr-image
-    runs-on: self-hosted
+    needs: build-and-push-ecr-image  # Run only after the build job completes successfully
+    runs-on: self-hosted # Uses a self-hosted runner for deployment
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3 # Fetch the latest code from the repository
+
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -78,18 +83,19 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v1 # Authenticate with AWS ECR
       
       - name: Free Up Disk Space
         run: |
-          docker system prune -af
+          docker system prune -af # Remove unused Docker data
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
-          sudo journalctl --vacuum-time=1d
-          df -h
+          sudo journalctl --vacuum-time=1d # Clear system logs
+          df -h # Display disk space usage
           
       - name: Pull latest images
         run: |
+         # Pull the latest Docker image from ECR
          docker pull ${{secrets.AWS_ECR_LOGIN_URI}}/${{ secrets.ECR_REPOSITORY_NAME }}:latest
          
       #- name: Stop and remove  container if running
@@ -98,6 +104,7 @@ jobs:
        
       - name: Run Docker Image to serve users
         run: |
+         # Run the newly pulled Docker container
          docker run -d -p 8080:8080 --ipc="host" --name=networksecurity -e 'AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}' -e 'AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}' -e 'AWS_REGION=${{ secrets.AWS_REGION }}'  ${{secrets.AWS_ECR_LOGIN_URI}}/${{ secrets.ECR_REPOSITORY_NAME }}:latest
       - name: Clean previous images and containers
         run: |

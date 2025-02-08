@@ -13,8 +13,8 @@ class DataValidation:
     def __init__(self,data_ingestion_artifact:DataIngestionArtifact,
                  data_validation_config:DataValidationConfig):
         """
-        Constructor to initialize DataValidation with the data ingestion artifact 
-        and data validation configuration.
+        Initializes DataValidation with data ingestion artifact and validation configuration.
+        Loads the schema configuration for validation.
         """
         try:
             self.data_ingestion_artifact=data_ingestion_artifact
@@ -52,8 +52,8 @@ class DataValidation:
     
     def detect_dataset_drift(self,base_df,current_df,thresshold=0.05)->bool:
         """
-        Detects dataset drift between the base dataframe (e.g., train) and the current dataframe (e.g., test).
-        Drift is determined using the KS test for each column.
+        Detects dataset drift using the KS test.
+        Compares the distributions of each column in base_df (train) and current_df (test).
         """
         try:
             status=True
@@ -65,11 +65,12 @@ class DataValidation:
                 is_same_dist=ks_2samp(d1, d2)
 
                 # Check if p-value is below the threshold (indicating drift)
+                # Determine if drift is detected
                 if thresshold <= is_same_dist.pvalue:
                     is_found = False
                 else:
                     is_found = True
-                    status=False
+                    status=False # If any column has drift, set overall status to False
                 
                 # Update drift report
                 report.update({column:{

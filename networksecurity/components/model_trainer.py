@@ -23,6 +23,7 @@ from sklearn.ensemble import (
 )
 import mlflow
 import dagshub
+# Initialize DagsHub for MLFLOW tracking
 dagshub.init(repo_owner='ankitmishra06', repo_name='NetworkSecurity', mlflow=True)
 
 
@@ -40,7 +41,15 @@ class ModelTrainer:
     
     # mlflow.set_tracking_uri(uri="http://127.0.0.1:5000")
     def track_mlflow(self,best_model, classificationmetric):
+        """
+        Logs model performance metrics to MLflow.
+        
+        Args:
+            best_model: Trained model to be logged.
+            classificationmetric: Object containing F1-score, precision, and recall values.
+        """
         with mlflow.start_run():
+            # Log key classification metrics
             f1_score=classificationmetric.f1_score
             precision_score=classificationmetric.precision_score
             recall_score=classificationmetric.recall_score
@@ -48,6 +57,8 @@ class ModelTrainer:
             mlflow.log_metric("f1_score",f1_score)
             mlflow.log_metric("precision",precision_score)
             mlflow.log_metric("recall_score",recall_score)
+
+            # Log the trained model in MLflow
             mlflow.sklearn.log_model(
                 sk_model = best_model,
                 artifact_path = "model"
@@ -121,14 +132,18 @@ class ModelTrainer:
         ]
         best_model = models[best_model_name]
 
-        # Evaluate the best model on training and testing datasets
+        # Evaluate the best model on training data
         y_train_pred=best_model.predict(X_train)
         classification_train_metirc=get_classification_score(y_true=y_train,y_pred=y_train_pred)
-        # Track with mlflow
+
+        # Track training metrics in MLflow
         self.track_mlflow(best_model,classification_train_metirc)
 
+        # Evaluate the best model on testing data
         y_test_pred=best_model.predict(X_test)
         classification_test_metric=get_classification_score(y_true=y_test,y_pred=y_test_pred)
+
+        # Track test metrics in MLflow
         self.track_mlflow(best_model=best_model,classificationmetric=classification_test_metric)
 
         # Load the preprocessor used during data transformation
@@ -136,14 +151,16 @@ class ModelTrainer:
             file_path=self.data_transformation_artifact.transformed_object_file_path
         )
 
-        # Save the best model along with the preprocessor
+        # Ensure directory exists before saving the model
         modle_dir_path = os.path.dirname(self.modle_trainer_config.trained_model_file_path)
         os.makedirs(modle_dir_path)
 
+        # Create a network model wrapper with preprocessor and trained model
         Network_Model = NetworkModel(
             preprocessor=preprocessor, model= best_model
         )
-        save_object(self.modle_trainer_config.trained_model_file_path,obj=NetworkModel)
+        # Save trained model and preprocessor
+        save_object(self.modle_trainer_config.trained_model_file_path,obj=Network_Model)
         save_object("final_model/model.pkl", best_model)
 
         # Create and log the ModelTrainerArtifact
@@ -163,15 +180,15 @@ class ModelTrainer:
             ModelTrainerArtifact: Contains details of the trained model and its metrics.
         """
         try:
-            # Load transformed training and testing datasets
+            # Get paths for transformed training and testing data
             train_file_path = self.data_transformation_artifact.transformed_train_file_path
             test_file_path = self.data_transformation_artifact.trasformed_test_file_path
 
-            # loading training and testing array
+            # Load transformed training and testing arrays
             train_arr = load_numpy_array_data(train_file_path)
             test_arr = load_numpy_array_data(test_file_path)
 
-            # Split features and labels
+            # Load transformed training and testing arrays
             X_train, y_train, X_test, y_test=(
                 train_arr[:,:-1],
                 train_arr[:,-1],

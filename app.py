@@ -2,12 +2,9 @@ import sys
 import os
 
 import certifi
-ca = certifi.where()
+
 
 from dotenv import load_dotenv
-load_dotenv()
-mongo_db_url = os.getenv("MONGODB_URL_KEY")
-print(mongo_db_url)
 import pymongo
 from networksecurity.exception.exception import NetworkSecurityException
 from networksecurity.logging.logger import logging
@@ -24,16 +21,24 @@ from networksecurity.utils.main_utils.utils import load_object
 
 from networksecurity.utils.ml_utils.model.estimator import NetworkModel
 
-
-client = pymongo.MongoClient(mongo_db_url, tlsCAFile=ca)
-
 from networksecurity.constant.training_pipeline import DATA_INGESTION_COLLECTION_NAME
 from networksecurity.constant.training_pipeline import DATA_INGESTION_DATABASE_NAME
+# Load environment variables from .env file
+load_dotenv()
+mongo_db_url = os.getenv("MONGODB_URL_KEY")
+print(mongo_db_url)
 
+# Establish MongoDB connection
+ca = certifi.where()
+client = pymongo.MongoClient(mongo_db_url, tlsCAFile=ca)
 database = client[DATA_INGESTION_DATABASE_NAME]
 collection = database[DATA_INGESTION_COLLECTION_NAME]
 
+
+# Initialize FastAPI app
 app = FastAPI()
+
+# Configure CORS (allows all origins for now)
 origins = ["*"]
 
 app.add_middleware(
@@ -44,15 +49,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Set up Jinja2 template rendering
 from fastapi.templating import Jinja2Templates
 templates = Jinja2Templates(directory="./templates")
 
 @app.get("/", tags=["authentication"])
 async def index():
+    """
+    Redirects the root endpoint to the API documentation.
+    """
     return RedirectResponse(url="/docs")
 
 @app.get("/train")
 async def train_route():
+    """
+    Triggers the training pipeline for the machine learning model.
+    """
     try:
         train_pipeline=TrainingPipeline()
         train_pipeline.run_pipeline()
@@ -62,20 +74,39 @@ async def train_route():
     
 @app.post("/predict")
 async def predict_route(request: Request,file: UploadFile = File(...)):
+    """
+    Handles file uploads and performs predictions using the trained model.
+    
+    Args:
+        request (Request): The HTTP request object.
+        file (UploadFile): The uploaded CSV file containing input data.
+
+    Returns:
+        HTML response with a table displaying the predictions.
+    """
     try:
+        # Read uploaded CSV file
         df=pd.read_csv(file.file)
         #print(df)
+        # Load preprocessor and trained model
         preprocesor=load_object("final_model/preprocessor.pkl")
         final_model=load_object("final_model/model.pkl")
+
+        # Create network model instance
         network_model = NetworkModel(preprocessor=preprocesor,model=final_model)
         print(df.iloc[0])
+        # Predict output
         y_pred = network_model.predict(df)
         print(y_pred)
         df['predicted_column'] = y_pred
         print(df['predicted_column'])
         #df['predicted_column'].replace(-1, 0)
         #return df.to_json()
+
+        # Save predictions to CSV file
         df.to_csv('prediction_output/output.csv')
+
+        # Convert DataFrame to HTML table for rendering in the UI
         table_html = df.to_html(classes='table table-striped')
         #print(table_html)
         return templates.TemplateResponse("table.html", {"request": request, "table": table_html})
@@ -83,6 +114,6 @@ async def predict_route(request: Request,file: UploadFile = File(...)):
     except Exception as e:
             raise NetworkSecurityException(e,sys)
 
-    
+# Start FastAPI application    
 if __name__=="__main__":
-    app_run(app,host="0.0.0.0",port=8000)
+    app_run(app,host="0.0.0.0",port=8080)
