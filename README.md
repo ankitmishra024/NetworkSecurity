@@ -85,7 +85,7 @@ Below is the architecture of different pipelines used in this project.
 1. **Clone the Repository:**
    ```sh
    git clone <repository_url>
-   cd network-security-phishing-detection
+   cd NetworkSecurity
    ```
 
 2. **Install Dependencies:**
@@ -129,7 +129,7 @@ Below is the architecture of different pipelines used in this project.
 - **MongoDB** (Data Storage)
 - **MLflow** (Model Logging)
 - **Docker**(Image)
--**Github Action** (CI/CD)
+- **Github Action** (CI/CD)
 - **AWS S3** (Cloud Storage for Artifacts)
 - **AwS ECR** (Deployment of Docker image)
 - **AWS EC2** (For Deployment in AWS environment)
