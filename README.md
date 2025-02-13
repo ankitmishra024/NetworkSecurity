@@ -1,7 +1,7 @@
-# Network Security: Phishing Detection Project
+# Network Security: Malicious Website Detection Project
 
 ## 📌 Overview
-This project is designed to detect phishing attacks using machine learning. It includes various stages such as data ingestion, validation, transformation, model training, and prediction. The system is built with **FastAPI**, **MongoDB**, and **MLflow** for tracking the model pipeline.
+This project is designed to detect malicious website using machine learning. It includes various stages such as data ingestion, validation, transformation, model training, and prediction. The system is built with **FastAPI**, **MongoDB**, and **MLflow** for tracking the model pipeline.
 
 ## 🔧 Project Workflow
 The project follows a structured pipeline approach:
@@ -84,7 +84,7 @@ Below is the architecture of different pipelines used in this project.
 
 1. **Clone the Repository:**
    ```sh
-   git clone <repository_url>
+   git clone https://github.com/ankitmishra024/NetworkSecurity.git
    cd NetworkSecurity
    ```
 
@@ -101,19 +101,19 @@ Below is the architecture of different pipelines used in this project.
 
 4. **Run the API Server:**
    ```sh
-   uvicorn main:app --host 0.0.0.0 --port 8080
+   uvicorn app:app --reload
    ```
 
 5. **Train the Model:**
    Open your browser and visit:
    ```
-   http://127.0.0.1:8080/train
+   http://127.0.0.1:8080/train or http://127.0.0.1:8000/train
    ```
 
 6. **Make Predictions:**
-   - Upload a CSV file using:
+   - Upload a CSV file using:(file in valid_data folder)
    ```
-   http://127.0.0.1:8080/predict
+   http://127.0.0.1:8080/predict or http://127.0.0.1:8000/train
    ```
 
 
@@ -135,6 +135,6 @@ Below is the architecture of different pipelines used in this project.
 - **AWS EC2** (For Deployment in AWS environment)
 
 ---
-💡 _This project aims to enhance network security by detecting phishing attacks effectively using ML techniques.
+💡 _This project aims to enhance network security by detecting malicious website effectively using ML techniques.
 
 

@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 ## Log_file format
-LOG_FILE=f"{datetime.now().strftime("%d_%m_%Y_%H_%M_%S")}.log"
+LOG_FILE=f"{datetime.now().strftime('%d_%m_%Y_%H_%M_%S')}.log"
 
 ## log_file path where log get store
 log_path=os.path.join(os.getcwd(),"logs",LOG_FILE)
